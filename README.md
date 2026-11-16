@@ -90,6 +90,7 @@ el servidor, especialmente si la carpeta `dist` no existía al arrancar.
 
 - [Guía Railway: PostgreSQL, variables y dos servicios o servicio conjunto](docs/RAILWAY.md).
 - [Angular + Capacitor para Android](docs/MOVIL.md).
+- [Actualización en vivo y mediciones de latencia](docs/ACTUALIZACION_EN_VIVO.md).
 - [Simulación Wokwi y generación de nodos](docs/SIMULACION.md).
 - [Actualizar certificados HTTPS del firmware](certs/README.md).
 

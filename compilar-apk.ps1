@@ -1,5 +1,7 @@
 param(
-    [string]$BackendUrl = 'https://proyectoiot-production-c42015b2.up.railway.app'
+    [string]$BackendUrl = 'https://proyectoiot-production-c42015b2.up.railway.app',
+    [int]$VersionCode = 3,
+    [string]$VersionName = '1.2'
 )
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
@@ -24,6 +26,8 @@ try {
     }
     & npm run mobile:sync
     if ($LASTEXITCODE -ne 0) { throw 'Falló la compilación o sincronización Angular.' }
+    & node scripts/android-version.mjs $VersionCode $VersionName
+    if ($LASTEXITCODE -ne 0) { throw 'Falló la configuración de versión Android.' }
     Push-Location 'android'
     try {
         & .\gradlew.bat assembleDebug --console=plain
@@ -31,7 +35,7 @@ try {
     } finally { Pop-Location }
     $outputDirectory = Join-Path $PSScriptRoot 'apk'
     New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
-    $apkPath = Join-Path $outputDirectory 'Parquea-Admin-1.0-debug.apk'
+    $apkPath = Join-Path $outputDirectory "Parquea-Admin-$VersionName-debug.apk"
     Copy-Item -LiteralPath 'android\app\build\outputs\apk\debug\app-debug.apk' -Destination $apkPath -Force
     Write-Host "APK de prueba generado: $apkPath"
 } finally { Pop-Location }

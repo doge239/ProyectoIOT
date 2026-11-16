@@ -13,7 +13,7 @@ Desde la raíz en PowerShell, con Java 21 y el SDK de Android instalados:
 .\compilar-apk.ps1
 ```
 
-El resultado queda en `apk/Parquea-Admin-1.0-debug.apk`, excluido de Git. El
+El resultado queda en `apk/Parquea-Admin-1.2-debug.apk`, excluido de Git. El
 script compila Angular, sincroniza Capacitor y ejecuta `assembleDebug`. Usa
 el backend Railway desplegado; puedes cambiarlo con `-BackendUrl https://...`.
 No se incluyen contraseñas ni claves de sensores en el APK.
@@ -29,6 +29,18 @@ La APK generada fue verificada con `apksigner` e instalada en un emulador
 Android. Se comprobaron login contra Railway, carga de los cuatro puestos,
 apertura del editor y cierre de sesión. La configuración incluida usa HTTPS
 y no contiene la contraseña del administrador ni claves de sensores.
+
+La versión 1.1 (versionCode 2) recibe los cambios por una conexión en vivo,
+sin esperar consultas cada 1,5 segundos. Puede instalarse sobre la APK 1.0
+generada en este equipo, porque conserva la identidad y la clave de firma.
+La APK anterior no recibe automáticamente el nuevo código de Angular:
+instala la versión 1.1 o posterior para usar esta mejora.
+
+La versión actual es 1.2 (versionCode 3). Incluye textos más oscuros, estados
+con etiquetas de fondo oscuro y texto blanco, letras pequeñas de al menos
+12 px y bordes más visibles en campos y tarjetas. Conserva las actualizaciones
+en vivo de 1.1 y puede instalarse sobre las versiones anteriores generadas en
+este equipo. El frontend Railway se publica con los mismos estilos.
 
 Después de desplegar el backend por HTTPS, desde `frontend/`:
 

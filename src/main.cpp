@@ -34,6 +34,9 @@ namespace {
 constexpr char WIFI_SSID[] = IOT_WIFI_SSID;
 constexpr char TELEMETRY_URL[] = IOT_TELEMETRY_URL;
 constexpr uint32_t SEND_INTERVAL_MS = 750;
+constexpr uint32_t SAMPLE_INTERVAL_MS = 40;
+constexpr uint32_t MIN_SEND_INTERVAL_MS = 100;
+constexpr uint32_t ERROR_RETRY_MS = 1000;
 constexpr uint32_t WIFI_RETRY_MS = 10000;
 constexpr int OCCUPIED_THRESHOLD = 2500;
 constexpr int FREE_THRESHOLD = 1800;
@@ -55,8 +58,15 @@ Slot slots[] = {
 constexpr size_t FIRST_SLOT = PARKING_SLOT == 0 ? 0 : PARKING_SLOT - 1;
 constexpr size_t END_SLOT = PARKING_SLOT == 0 ? 4 : PARKING_SLOT;
 uint32_t lastSend;
+uint32_t lastSample;
+uint8_t lastSentSignature = 255;
+bool lastSendFailed;
 uint32_t lastWifiAttempt;
 bool wifiWasConnected;
+WiFiClient plainClient;
+WiFiClientSecure secureClient;
+HTTPClient telemetryHttp;
+bool httpReady;
 
 String collectTelemetry() {
   String payload;
@@ -88,41 +98,49 @@ String collectTelemetry() {
   return payload;
 }
 
-void sendTelemetry() {
-  String payload = collectTelemetry();
-  if (payload == "{}") {
-    return;  // El servidor detecta la falta de reportes.
+uint8_t telemetrySignature() {
+  uint8_t signature = 0;
+  for (size_t i = FIRST_SLOT; i < END_SLOT; ++i) {
+    if (digitalRead(slots[i].linkPin) == LOW) {
+      signature |= (slots[i].occupied ? 3 : 1) << (2 * i);
+    }
   }
+  return signature;
+}
 
+bool sendTelemetry(const String& payload) {
   const bool secure = String(TELEMETRY_URL).startsWith("https://");
   if (secure && time(nullptr) < 1700000000) {
     Serial.println("Esperando hora NTP para verificar HTTPS...");
-    return;
+    return false;
   }
-  WiFiClient plainClient;
-  WiFiClientSecure secureClient;
-  if (secure) {
-    secureClient.setCACertBundle(rootca_crt_bundle_start);
+  if (!httpReady) {
+    if (secure) secureClient.setCACertBundle(rootca_crt_bundle_start);
+    WiFiClient& client = secure ? static_cast<WiFiClient&>(secureClient) : plainClient;
+    if (!telemetryHttp.begin(client, TELEMETRY_URL)) {
+      Serial.println("No se pudo iniciar HTTP.");
+      return false;
+    }
+    telemetryHttp.setReuse(true);  // Conserva TCP/TLS entre reportes.
+    telemetryHttp.setConnectTimeout(secure ? 5000 : 700);
+    telemetryHttp.setTimeout(secure ? 5000 : 1000);
+    httpReady = true;
   }
-  WiFiClient& client = secure ? static_cast<WiFiClient&>(secureClient) : plainClient;
-  HTTPClient http;
-  if (!http.begin(client, TELEMETRY_URL)) {
-    Serial.println("No se pudo iniciar HTTP.");
-    return;
-  }
-  http.setConnectTimeout(secure ? 5000 : 700);
-  http.setTimeout(secure ? 5000 : 1000);
-  http.addHeader("Content-Type", "application/json");
-  if (strlen(IOT_DEVICE_KEY) > 0) {
-    http.addHeader("X-Device-Key", IOT_DEVICE_KEY);
-  }
-  const int status = http.POST(payload);
-  http.end();
+  // HTTPClient limpia los encabezados al terminar cada petición.
+  telemetryHttp.addHeader("Content-Type", "application/json");
+  if (strlen(IOT_DEVICE_KEY) > 0) telemetryHttp.addHeader("X-Device-Key", IOT_DEVICE_KEY);
+  const uint32_t started = millis();
+  const int status = telemetryHttp.POST(payload);
 
   if (status == 204) {
     Serial.println(payload);
+    Serial.printf("Reporte aceptado | HTTP %lu ms\n", millis() - started);
+    return true;
   } else {
     Serial.printf("Servidor HTTP (%d). Revisa URL, conectividad y clave del sensor.\n", status);
+    telemetryHttp.end();
+    httpReady = false;
+    return false;
   }
 }
 }  // namespace
@@ -151,15 +169,26 @@ void loop() {
       Serial.println(WiFi.localIP());
     } else {
       Serial.println("Wi-Fi desconectado.");
+      telemetryHttp.end();
+      httpReady = false;
     }
   }
 
-  if (connected && now - lastSend >= SEND_INTERVAL_MS) {
-    lastSend = now;
-    sendTelemetry();
+  if (connected && now - lastSample >= SAMPLE_INTERVAL_MS) {
+    lastSample = now;
+    const String payload = collectTelemetry();
+    const uint8_t signature = telemetrySignature();
+    const uint32_t elapsed = now - lastSend;
+    const bool changed = signature != lastSentSignature;
+    if (payload != "{}" && elapsed >= (lastSendFailed ? ERROR_RETRY_MS : MIN_SEND_INTERVAL_MS)
+        && (changed || elapsed >= SEND_INTERVAL_MS)) {
+      lastSendFailed = !sendTelemetry(payload);
+      lastSend = millis();
+      if (!lastSendFailed) lastSentSignature = signature;
+    }
   } else if (!connected && now - lastWifiAttempt >= WIFI_RETRY_MS) {
     lastWifiAttempt = now;
     WiFi.reconnect();
   }
-  delay(15);
+  delay(5);
 }

@@ -39,10 +39,17 @@ export class App implements OnInit, OnDestroy {
     (this.filter() === 'todos' || slot.estado === this.filter()) &&
     `${slot.id} ${slot.nombre} ${slot.sector}`.toLocaleLowerCase().includes(this.search().toLocaleLowerCase())));
   private timer?: ReturnType<typeof setTimeout>;
+  private stream?: AbortController;
+  private pollingFallback = false;
+  private refreshVersion = 0;
   private disposed = false;
   private trigger?: HTMLElement;
+  private visibilityHandler = () => {
+    if (document.visibilityState === 'visible' && this.authenticated()) void this.refresh();
+  };
 
   async ngOnInit() {
+    document.addEventListener('visibilitychange', this.visibilityHandler);
     try {
       await this.api.configure();
       if (this.api.token) {
@@ -56,7 +63,10 @@ export class App implements OnInit, OnDestroy {
     } finally { this.ready.set(true); }
   }
 
-  ngOnDestroy() { this.disposed = true; clearTimeout(this.timer); }
+  ngOnDestroy() {
+    this.disposed = true; clearTimeout(this.timer); this.stream?.abort();
+    document.removeEventListener('visibilitychange', this.visibilityHandler);
+  }
   message(error: unknown) { return error instanceof Error ? error.message : 'No se pudo completar la operación.'; }
 
   async login() {
@@ -85,29 +95,61 @@ export class App implements OnInit, OnDestroy {
   }
 
   endSession() {
-    this.api.setToken(''); clearTimeout(this.timer);
+    this.api.setToken(''); clearTimeout(this.timer); this.stream?.abort();
     this.authenticated.set(false); this.connected.set(false);
     this.slots.set([]); this.editing.set(null); this.notice.set(''); this.error.set('');
   }
 
   async refresh() {
     clearTimeout(this.timer);
+    this.stream?.abort();
+    const version = ++this.refreshVersion;
     const token = this.api.token;
     try {
       const snapshot = await this.api.request<Snapshot>('/api/puestos');
-      if (this.disposed || token !== this.api.token) return;
-      this.slots.set(Object.values(snapshot.puestos)); this.config.set(snapshot.configuracion);
-      this.updated.set(snapshot.hora_servidor); this.connected.set(true);
+      if (this.disposed || token !== this.api.token || version !== this.refreshVersion) return;
+      this.applySnapshot(snapshot);
+      if (this.pollingFallback) this.timer = setTimeout(() => void this.refresh(), 500);
+      else void this.connectStream(token);
     } catch (error) {
-      if (this.disposed || token !== this.api.token) return;
-      this.connected.set(false);
-      this.slots.update(slots => slots.map(slot => ({ ...slot, adc: null, estado_sensor: 'sin_datos', estado: slot.habilitado ? 'sin_datos' : 'deshabilitado' })));
+      if (this.disposed || token !== this.api.token || version !== this.refreshVersion) return;
+      this.markOffline();
       if (error instanceof ApiError && error.status === 401) {
         this.endSession(); this.error.set('Tu sesión expiró. Vuelve a ingresar.');
       }
     } finally {
-      if (!this.disposed && this.authenticated() && token === this.api.token)
-        this.timer = setTimeout(() => void this.refresh(), this.connected() ? 1500 : 4000);
+      if (!this.disposed && this.authenticated() && token === this.api.token && version === this.refreshVersion && !this.connected())
+        this.timer = setTimeout(() => void this.refresh(), 1000);
+    }
+  }
+
+  private applySnapshot(snapshot: Snapshot) {
+    this.slots.set(Object.values(snapshot.puestos)); this.config.set(snapshot.configuracion);
+    this.updated.set(snapshot.hora_servidor); this.connected.set(true);
+  }
+
+  private markOffline() {
+    this.connected.set(false);
+    this.slots.update(slots => slots.map(slot => ({ ...slot, adc: null, estado_sensor: 'sin_datos', estado: slot.habilitado ? 'sin_datos' : 'deshabilitado' })));
+  }
+
+  private async connectStream(token: string) {
+    const controller = new AbortController();
+    this.stream = controller;
+    try {
+      await this.api.watchSlots(snapshot => {
+        if (!controller.signal.aborted && token === this.api.token) this.applySnapshot(snapshot);
+      }, controller.signal);
+    } catch (error) {
+      if (controller.signal.aborted || this.disposed || token !== this.api.token) return;
+      if (error instanceof ApiError && error.status === 401) {
+        this.endSession(); this.error.set('Tu sesión expiró. Vuelve a ingresar.');
+        return;
+      }
+      // Keep the app usable during a rolling backend update or on old servers.
+      this.pollingFallback = error instanceof ApiError && [404, 405].includes(error.status);
+      if (!this.pollingFallback) this.markOffline();
+      this.timer = setTimeout(() => void this.refresh(), this.pollingFallback ? 500 : 1000);
     }
   }
 

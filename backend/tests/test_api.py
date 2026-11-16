@@ -2,6 +2,9 @@ from datetime import timedelta
 from types import SimpleNamespace
 import os
 import uuid
+import asyncio
+import json
+import httpx
 
 from fastapi.testclient import TestClient
 from pwdlib import PasswordHash
@@ -144,3 +147,45 @@ def test_login_rate_limit(client):
     for _ in range(10):
         assert client.post('/api/auth/login', json={"username": "admin", "password": "incorrecta"}).status_code == 401
     assert client.post('/api/auth/login', json={"username": "admin", "password": PASSWORD}).status_code == 429
+
+
+def test_stream_requires_admin(client):
+    assert client.get('/api/puestos/stream').status_code == 401
+    assert client.get('/api/puestos/stream', headers={"X-Device-Key": DEVICE_KEY}).status_code == 401
+
+
+def test_stream_pushes_changes_and_revokes_session(setup):
+    async def check():
+        app = create_app(setup)
+        async with app.router.lifespan_context(app):
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url='http://test') as client:
+                token = (await client.post('/api/auth/login', json={"username": "admin", "password": PASSWORD})).json()['token']
+                headers = {"Authorization": "Bearer " + token}
+                endpoint = next(route.endpoint for route in app.routes if getattr(route, 'path', '') == '/api/puestos/stream')
+
+                async def disconnected():
+                    return False
+
+                response = await endpoint(SimpleNamespace(is_disconnected=disconnected), headers['Authorization'])
+                iterator = response.body_iterator
+
+                async def next_message():
+                    while True:
+                        chunk = await anext(iterator)
+                        if chunk.strip():
+                            return json.loads(chunk)
+
+                try:
+                    assert len((await next_message())['puestos']) == 4
+                    assert (await client.post('/api/telemetria', json=reading(), headers={"X-Device-Key": DEVICE_KEY})).status_code == 204
+                    # The notification must wake the stream before its 1s timer.
+                    update = await asyncio.wait_for(next_message(), timeout=0.9)
+                    assert update['puestos']['A1']['estado'] == 'ocupado'
+                    await client.put('/api/puestos/A1', json=slot_edit(), headers=headers)
+                    update = await asyncio.wait_for(next_message(), timeout=0.9)
+                    assert update['puestos']['A1']['estado'] == 'deshabilitado'
+                    await client.post('/api/auth/logout', headers=headers)
+                    assert (await asyncio.wait_for(next_message(), timeout=0.9))['error'] == 'session_expired'
+                finally:
+                    await iterator.aclose()
+    asyncio.run(check())

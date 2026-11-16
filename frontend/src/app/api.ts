@@ -31,6 +31,53 @@ export class Api {
     else sessionStorage.removeItem('parking-session');
   }
 
+  async watchSlots(onSnapshot: (snapshot: Snapshot) => void, signal: AbortSignal): Promise<void> {
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    signal.addEventListener('abort', abort, { once: true });
+    if (signal.aborted) controller.abort();
+    let watchdog = setTimeout(abort, 8000);
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+    try {
+      const response = await fetch(this.base + '/api/puestos/stream', {
+        headers: { Authorization: `Bearer ${this.token}` },
+        cache: 'no-store', signal: controller.signal,
+      });
+      if (!response.ok) throw new ApiError(response.status, 'No se pudo abrir la conexión en vivo.');
+      if (!response.body) throw new ApiError(404, 'Este dispositivo requiere actualización por consultas.');
+      reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let pending = '';
+      while (!signal.aborted) {
+        const { value, done } = await reader.read();
+        if (done) throw new ApiError(0, 'Se cerró la conexión en vivo.');
+        clearTimeout(watchdog);
+        watchdog = setTimeout(abort, 5000);
+        pending += decoder.decode(value, { stream: true });
+        if (pending.length > 65536) throw new ApiError(0, 'Respuesta del servidor inválida.');
+        let end: number;
+        while ((end = pending.indexOf('\n')) >= 0) {
+          const line = pending.slice(0, end).trim();
+          pending = pending.slice(end + 1);
+          if (!line) continue;
+          const event = JSON.parse(line);
+          if (event.error === 'session_expired') throw new ApiError(401, 'La sesión expiró.');
+          if (!event.puestos || !event.configuracion) throw new ApiError(0, 'Respuesta del servidor inválida.');
+          onSnapshot(event as Snapshot);
+        }
+      }
+    } catch (error) {
+      if (signal.aborted) return;
+      throw error instanceof ApiError ? error : new ApiError(0, 'Se perdió la conexión en vivo.');
+    } finally {
+      clearTimeout(watchdog);
+      signal.removeEventListener('abort', abort);
+      controller.abort();
+      await reader?.cancel().catch(() => undefined);
+      reader?.releaseLock();
+    }
+  }
+
   async request<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
     const headers: Record<string, string> = {};
     if (this.token) headers['Authorization'] = `Bearer ${this.token}`;

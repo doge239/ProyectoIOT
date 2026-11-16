@@ -2,6 +2,14 @@
 
 ## Configuración activa en este equipo: Railway
 
+El firmware optimizado conserva la conexión HTTPS y detecta cambios cada
+40 ms. Intenta enviar inmediatamente los cambios de ocupación, con un mínimo
+de 100 ms entre envíos, y mantiene reportes periódicos cada 750 ms más la
+duración de la petición. Después de recompilar, reinicia Wokwi para cargarlo.
+En el monitor serial aparece `Reporte aceptado | HTTP ... ms` para observar
+la duración real de cada envío. El primer envío puede tardar más por Wi-Fi,
+sincronización NTP y establecimiento de TLS.
+
 `include/config.local.h` apunta ahora al backend de producción con su clave
 de sensor, y el firmware principal se recompiló con esa configuración.
 Detén una simulación que ya estuviera abierta y vuelve a ejecutar

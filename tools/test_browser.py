@@ -82,10 +82,11 @@ with sync_playwright() as p:
         page.screenshot(path=str(out / 'dashboard-mobile.png'), full_page=True)
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Desbordamiento móvil'
 
-        page.route('**/api/puestos', lambda route: route.abort())
+        page.route('**/api/puestos**', lambda route: route.abort())
+        page.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
         expect(page.get_by_text('Reconectando…', exact=True)).to_be_visible(timeout=15000)
         expect(page.locator('.parking-slot[data-state="libre"]')).to_have_count(0)
-        page.unroute('**/api/puestos')
+        page.unroute('**/api/puestos**')
         expect(page.get_by_text('Servidor conectado', exact=True)).to_be_visible(timeout=15000)
     finally:
         for slot_id, slot in original['puestos'].items():

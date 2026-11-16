@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
+import asyncio
 from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
+import json
 import secrets
 import time
 from typing import Annotated
@@ -9,6 +11,7 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
 from pwdlib import PasswordHash
 from sqlalchemy import delete, select, text, update
@@ -62,9 +65,20 @@ def create_app(settings=None):
     except Exception as exc:
         raise RuntimeError("ADMIN_PASSWORD_HASH no es un hash Argon2 válido.") from exc
     engine, sessions = open_database(config.database_url)
+    listeners = set()
+    event_loop = None
+
+    def publish_change():
+        def notify():
+            for listener in tuple(listeners):
+                listener.set()
+        if event_loop is not None:
+            event_loop.call_soon_threadsafe(notify)
 
     @asynccontextmanager
     async def lifespan(app):
+        nonlocal event_loop
+        event_loop = asyncio.get_running_loop()
         Base.metadata.create_all(engine)
         with sessions.begin() as db:
             for number in range(1, 5):
@@ -111,13 +125,16 @@ def create_app(settings=None):
 
     Db = Annotated[Session, Depends(database)]
 
-    def admin(db: Db, authorization: Annotated[str | None, Header()] = None):
+    def validate_admin(db, authorization):
         if not authorization or not authorization.startswith("Bearer "):
             raise HTTPException(401, "Inicia sesión como administrador.")
         session = db.get(AdminSession, fingerprint(authorization[7:]))
         if session is None or session.expires_at <= utcnow():
             raise HTTPException(401, "La sesión expiró. Vuelve a ingresar.")
         return session
+
+    def admin(db: Db, authorization: Annotated[str | None, Header()] = None):
+        return validate_admin(db, authorization)
 
     Admin = Annotated[AdminSession, Depends(admin)]
 
@@ -154,6 +171,7 @@ def create_app(settings=None):
     def logout(session: Admin, db: Db):
         db.delete(session)
         db.commit()
+        publish_change()
         return Response(status_code=204)
 
     def serialized(slot, stale_seconds, now):
@@ -165,13 +183,59 @@ def create_app(settings=None):
                 "adc": None if stale else slot.adc,
                 "ultimo_reporte": slot.received_at.isoformat() + "Z" if slot.received_at else None}
 
-    @app.get("/api/puestos")
-    def slots(db: Db, session: Admin):
+    def snapshot(db):
         site = db.get(SiteSettings, 1)
         now = utcnow()
         entries = {slot.id: serialized(slot, site.stale_seconds, now) for slot in db.scalars(select(Slot).order_by(Slot.id))}
         return {"puestos": entries, "configuracion": {"nombre": site.name, "segundos_sin_datos": site.stale_seconds},
                 "hora_servidor": now.isoformat() + "Z"}
+
+    @app.get("/api/puestos")
+    def slots(db: Db, session: Admin):
+        return snapshot(db)
+
+    @app.get("/api/puestos/stream")
+    async def slot_stream(request: Request, authorization: Annotated[str | None, Header()] = None):
+        # Authenticate before sending HTTP 200. Each database transaction is
+        # short-lived; a connected phone never holds a database connection open.
+        def read():
+            with sessions() as db:
+                validate_admin(db, authorization)
+                return snapshot(db)
+
+        initial = await asyncio.to_thread(read)
+
+        async def events():
+            wake = asyncio.Event()
+            listeners.add(wake)
+            wake.set()  # Re-read once to cover a change during initial auth/read.
+            previous = None
+            current = initial
+            try:
+                while not await request.is_disconnected():
+                    state = json.dumps({"puestos": current["puestos"], "configuracion": current["configuracion"]}, sort_keys=True)
+                    if state != previous:
+                        yield json.dumps(current) + "\n"
+                        previous = state
+                    else:
+                        yield "\n"  # Heartbeat: detects a broken connection.
+                    try:
+                        await asyncio.wait_for(wake.wait(), timeout=1)
+                    except asyncio.TimeoutError:
+                        pass  # Recheck stale sensors, sessions and other workers.
+                    wake.clear()
+                    try:
+                        current = await asyncio.to_thread(read)
+                    except HTTPException as exc:
+                        if exc.status_code == 401:
+                            yield json.dumps({"error": "session_expired"}) + "\n"
+                            return
+                        raise
+            finally:
+                listeners.discard(wake)
+
+        return StreamingResponse(events(), media_type="application/x-ndjson",
+                                 headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
 
     @app.put("/api/puestos/{slot_id}")
     def edit_slot(slot_id: str, body: SlotEdit, db: Db, session: Admin):
@@ -184,6 +248,7 @@ def create_app(settings=None):
         slot.enabled = body.habilitado
         slot.disabled_reason = "" if body.habilitado else body.motivo_desactivacion
         db.commit()
+        publish_change()
         return serialized(slot, db.get(SiteSettings, 1).stale_seconds, utcnow())
 
     @app.put("/api/configuracion")
@@ -191,6 +256,7 @@ def create_app(settings=None):
         site = db.get(SiteSettings, 1)
         site.name, site.stale_seconds = body.nombre, body.segundos_sin_datos
         db.commit()
+        publish_change()
         return body
 
     @app.post("/api/telemetria", status_code=204)
@@ -215,6 +281,7 @@ def create_app(settings=None):
                 raise HTTPException(404, "Puesto no encontrado.")
             slot.occupied, slot.adc, slot.received_at = reading.ocupado, reading.adc, now
         db.commit()
+        publish_change()
         return Response(status_code=204)
 
     @app.get("/config.json")
