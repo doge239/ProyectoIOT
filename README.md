@@ -94,8 +94,10 @@ el servidor, especialmente si la carpeta `dist` no existía al arrancar.
 - [Actualizar certificados HTTPS del firmware](certs/README.md).
 
 Los Dockerfiles usan la raíz del repositorio como contexto. La guía detalla el
-Config File Path para cada servicio. El despliegue, los dominios y las variables
-de producción quedan pendientes de configurar en tu cuenta Railway.
+Dockerfile Path y el healthcheck para cada servicio. El backend ya está
+desplegado con PostgreSQL y el frontend también está disponible. Abre el
+[panel web](https://frontend-production-c90993e9.up.railway.app); la guía contiene
+las URLs y la ubicación local de las credenciales de producción.
 
 ## Estructura
 
@@ -136,5 +138,6 @@ Para comprobar la UI con un backend local activo:
 La prueba de navegador usa las credenciales locales, envía lecturas de prueba
 y restaura los metadatos al terminar. Capturas en `.local/screenshots/`.
 La base guarda solo la lectura más reciente, sin historial de ocupación.
-El despliegue real Railway y el recorrido HTTPS desde Wokwi hacia ese dominio
-se verifican una vez que tengas los servicios levantados.
+Se verificó el backend desplegado en Railway por HTTPS con login, telemetría y
+PostgreSQL. El recorrido desde el simulador Wokwi se verifica al incorporar su
+configuración de producción al firmware y reiniciar la simulación.

@@ -1,8 +1,50 @@
 # Despliegue en Railway
 
-El repositorio está preparado para dos modalidades. No hay servicios desplegados
-ni recursos contratados automáticamente. PostgreSQL almacena configuración,
+El repositorio está preparado para dos modalidades. PostgreSQL almacena configuración,
 última lectura por sensor y sesiones. No hay registro público de usuarios.
+
+## Servicios desplegados
+
+Panel Angular: https://frontend-production-c90993e9.up.railway.app
+
+El servicio `frontend` usa `frontend/Dockerfile`, sirve la aplicación por HTTPS
+y obtiene la dirección del backend desde `API_BASE_URL`. Su dominio está
+autorizado en `CORS_ORIGINS` del backend. Las credenciales de acceso están en
+`.local/railway-credenciales.txt`, solo en este equipo y excluidas de Git.
+
+El backend está desplegado en el proyecto `exciting-creativity`, servicio
+`ProyectoIOT`, conectado al servicio `Postgres` del mismo proyecto:
+
+- API: https://proyectoiot-production-c42015b2.up.railway.app
+- Healthcheck: https://proyectoiot-production-c42015b2.up.railway.app/api/health
+- Credenciales de producción: `.local/railway-credenciales.txt` (solo en este equipo).
+- Configuración del sensor preparada: `.local/railway-config.local.h`.
+
+Se verificaron HTTPS, salud de la base, login/logout, envío de telemetría y
+desactivación administrativa. Las lecturas de prueba vencen normalmente.
+La raíz de la URL del backend es una API; el dashboard Angular se abre desde
+el dominio del frontend indicado arriba.
+
+Para conectar Wokwi a este backend, conserva una copia de tu
+`include/config.local.h`, reemplázalo con `.local/railway-config.local.h` y
+recompila antes de reiniciar la simulación. No publiques esos archivos.
+
+Este despliegue se subió desde la copia local con Railway CLI. Para repetirlo
+desde la raíz, con la sesión y el proyecto ya vinculados:
+
+```powershell
+npx --yes @railway/cli up --service ProyectoIOT --environment production --detach
+```
+
+Para actualizar solamente el frontend desde la raíz del repositorio:
+
+```powershell
+npx --yes @railway/cli up --service frontend --environment production --detach
+```
+
+La configuración del servicio ya selecciona `backend/Dockerfile` y
+`/api/health`. No es necesario ser dueño del repositorio para subir tu copia
+local a un proyecto Railway al que tienes acceso.
 
 ## Opción A: frontend y backend separados
 
@@ -10,13 +52,17 @@ Crea un proyecto Railway con PostgreSQL y dos servicios desde este repositorio.
 En **ambos servicios deja Root Directory en la raíz del repositorio**: los
 Dockerfiles usan rutas `frontend/` y `backend/` desde ese contexto.
 
-| Servicio | Config File Path | Dockerfile | Healthcheck |
+| Servicio | Builder | Dockerfile Path | Healthcheck |
 | --- | --- | --- | --- |
-| Backend | `/backend/railway.json` | `backend/Dockerfile` | `/api/health` |
-| Frontend | `/frontend/railway.json` | `frontend/Dockerfile` | `/health` |
+| Backend | Dockerfile | `backend/Dockerfile` | `/api/health` |
+| Frontend | Dockerfile | `frontend/Dockerfile` | `/health` |
 
-Selecciona Config File Path en los ajustes del servicio para no utilizar el
-`railway.json` de la raíz. Genera un dominio público HTTPS para cada servicio.
+Configura esos campos directamente en los ajustes del servicio. Railway
+deprecó Config as Code: los servicios nuevos no pueden activar `railway.json`,
+y los servicios antiguos dejarán de leerlo el 1 de diciembre de 2026. Los
+archivos JSON del repositorio se conservan como referencia para servicios
+antiguos; para servicios nuevos usa los ajustes o Infrastructure as Code.
+Genera un dominio público HTTPS para cada servicio.
 
 ### Variables del backend
 
@@ -81,7 +127,8 @@ barra final ni rutas. No uses `*`. CORS no sustituye la autenticación.
 
 ## Opción B: un servicio para Angular y API
 
-Usa `Dockerfile` y `railway.json` de la raíz con PostgreSQL. El Dockerfile
+Selecciona Builder Dockerfile y Dockerfile Path `Dockerfile`, de la raíz, con
+PostgreSQL. Configura el healthcheck `/api/health`. El Dockerfile
 compila Angular y FastAPI sirve los archivos y `/api` bajo el mismo dominio.
 Configura las variables de backend de la tabla anterior. `CORS_ORIGINS` puede
 quedar vacío para la web del mismo origen; añade los orígenes de Capacitor si
@@ -125,6 +172,7 @@ ni reservas. Haz copias de seguridad de PostgreSQL según lo que necesites
 conservar. Un administrador puede cambiar los metadatos de los cuatro puestos;
 agregar sensores nuevos implica ampliar también sus identificadores y firmware.
 
-Referencias oficiales: [monorepos](https://docs.railway.com/deployments/monorepo),
+Referencias oficiales: [Infrastructure as Code y cambio de configuración](https://docs.railway.com/infrastructure-as-code),
+[monorepos](https://docs.railway.com/deployments/monorepo),
 [configuración como código](https://docs.railway.com/reference/config-as-code) y
 [variables](https://docs.railway.com/guides/variables).

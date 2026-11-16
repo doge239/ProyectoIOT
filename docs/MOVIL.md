@@ -2,7 +2,33 @@
 
 Angular es responsive y ya funciona desde el navegador del celular.
 Capacitor 8 está instalado y configurado en `frontend/capacitor.config.ts` para
-reutilizar la misma interfaz. No hay APK compilado ni publicación en tiendas.
+reutilizar la misma interfaz. Se genera un APK de prueba firmado con la clave
+debug del equipo; no hay publicación en tiendas ni APK release de distribución.
+
+## Compilar e instalar el APK de prueba
+
+Desde la raíz en PowerShell, con Java 21 y el SDK de Android instalados:
+
+```powershell
+.\compilar-apk.ps1
+```
+
+El resultado queda en `apk/Parquea-Admin-1.0-debug.apk`, excluido de Git. El
+script compila Angular, sincroniza Capacitor y ejecuta `assembleDebug`. Usa
+el backend Railway desplegado; puedes cambiarlo con `-BackendUrl https://...`.
+No se incluyen contraseñas ni claves de sensores en el APK.
+
+Copia el APK a tu teléfono Android (Android 7.0 o superior), ábrelo y permite
+la instalación desde la aplicación con la que lo abriste cuando Android lo
+solicite. Inicia sesión con las credenciales de producción de
+`.local/railway-credenciales.txt`. La aplicación requiere Internet para
+consultar Railway. Para distribuir en una tienda necesitas generar un build
+release y gestionar una clave de firma propia.
+
+La APK generada fue verificada con `apksigner` e instalada en un emulador
+Android. Se comprobaron login contra Railway, carga de los cuatro puestos,
+apertura del editor y cierre de sesión. La configuración incluida usa HTTPS
+y no contiene la contraseña del administrador ni claves de sensores.
 
 Después de desplegar el backend por HTTPS, desde `frontend/`:
 

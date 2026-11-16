@@ -1,5 +1,27 @@
 # Probar con Wokwi
 
+## Configuración activa en este equipo: Railway
+
+`include/config.local.h` apunta ahora al backend de producción con su clave
+de sensor, y el firmware principal se recompiló con esa configuración.
+Detén una simulación que ya estuviera abierta y vuelve a ejecutar
+**F1 → Wokwi: Start Simulator** para cargar el firmware nuevo. Abre la APK
+o el [panel web](https://frontend-production-c90993e9.up.railway.app) e inicia
+sesión con las credenciales de producción. No necesitas ejecutar el servidor
+Python local para esta conexión.
+
+Sube el potenciómetro A2 al máximo para verlo ocupado; bájalo al mínimo para
+verlo libre. Si un puesto está deshabilitado administrativamente, debes
+habilitarlo desde el panel para que su estado visible refleje la ocupación.
+Al detener los reportes de un puesto, se mostrará sin datos después del
+tiempo configurado (cinco segundos por defecto).
+
+La configuración local anterior se conserva en
+`.local/config-antes-de-railway.h`. Para volver a usar el servidor local,
+copia ese archivo a `include/config.local.h` y recompila antes de simular.
+
+## Alternativa: servidor local
+
 1. Inicia el backend y el frontend compilado con `./iniciar.ps1` desde PowerShell.
 2. Compila el ESP32 con **PlatformIO: Build**. El firmware debe incorporar la
    clave de `include/config.local.h`, creada por `python -m backend.configure`.
