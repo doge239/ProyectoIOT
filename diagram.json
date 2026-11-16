@@ -1,0 +1,410 @@
+{
+  "version": 1,
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-esp32-devkit-v1",
+      "id": "esp",
+      "top": 108,
+      "left": 10
+    },
+    {
+      "type": "wokwi-text",
+      "id": "a1_label",
+      "top": 18,
+      "left": 155,
+      "attrs": {
+        "text": "A1 · Puesto"
+      }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "a1_campo",
+      "top": 64,
+      "left": 155,
+      "attrs": {
+        "value": "890"
+      }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "a1_campo_label",
+      "top": 143,
+      "left": 155,
+      "attrs": {
+        "text": "Campo simulado"
+      }
+    },
+    {
+      "type": "wokwi-slide-switch",
+      "id": "a1_enlace",
+      "top": 211,
+      "left": 155,
+      "attrs": {
+        "value": "1",
+        "bounce": "0"
+      }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "a1_enlace_label",
+      "top": 265,
+      "left": 155,
+      "attrs": {
+        "text": "Fuera | En línea"
+      }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "a2_label",
+      "top": 18,
+      "left": 285,
+      "attrs": {
+        "text": "A2 · Puesto"
+      }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "a2_campo",
+      "top": 64,
+      "left": 285,
+      "attrs": {
+        "value": "98"
+      }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "a2_campo_label",
+      "top": 143,
+      "left": 285,
+      "attrs": {
+        "text": "Campo simulado"
+      }
+    },
+    {
+      "type": "wokwi-slide-switch",
+      "id": "a2_enlace",
+      "top": 211,
+      "left": 285,
+      "attrs": {
+        "value": "1",
+        "bounce": "0"
+      }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "a2_enlace_label",
+      "top": 265,
+      "left": 285,
+      "attrs": {
+        "text": "Fuera | En línea"
+      }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "a3_label",
+      "top": 18,
+      "left": 415,
+      "attrs": {
+        "text": "A3 · Puesto"
+      }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "a3_campo",
+      "top": 64,
+      "left": 415,
+      "attrs": {
+        "value": "890"
+      }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "a3_campo_label",
+      "top": 143,
+      "left": 415,
+      "attrs": {
+        "text": "Campo simulado"
+      }
+    },
+    {
+      "type": "wokwi-slide-switch",
+      "id": "a3_enlace",
+      "top": 211,
+      "left": 415,
+      "attrs": {
+        "value": "1",
+        "bounce": "0"
+      }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "a3_enlace_label",
+      "top": 265,
+      "left": 415,
+      "attrs": {
+        "text": "Fuera | En línea"
+      }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "a4_label",
+      "top": 18,
+      "left": 545,
+      "attrs": {
+        "text": "A4 · Puesto"
+      }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "a4_campo",
+      "top": 64,
+      "left": 545,
+      "attrs": {
+        "value": "98"
+      }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "a4_campo_label",
+      "top": 143,
+      "left": 545,
+      "attrs": {
+        "text": "Campo simulado"
+      }
+    },
+    {
+      "type": "wokwi-slide-switch",
+      "id": "a4_enlace",
+      "top": 211,
+      "left": 545,
+      "attrs": {
+        "value": "1",
+        "bounce": "0"
+      }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "a4_enlace_label",
+      "top": 265,
+      "left": 545,
+      "attrs": {
+        "text": "Fuera | En línea"
+      }
+    }
+  ],
+  "connections": [
+    [
+      "esp:TX0",
+      "$serialMonitor:RX",
+      "",
+      []
+    ],
+    [
+      "esp:RX0",
+      "$serialMonitor:TX",
+      "",
+      []
+    ],
+    [
+      "a1_campo:SIG",
+      "esp:D34",
+      "blue",
+      [
+        "v12",
+        "h-30",
+        "v0"
+      ]
+    ],
+    [
+      "a1_campo:VCC",
+      "esp:3V3",
+      "red",
+      [
+        "v24",
+        "h-36",
+        "v0"
+      ]
+    ],
+    [
+      "a1_campo:GND",
+      "esp:GND.2",
+      "black",
+      [
+        "v34",
+        "h-42",
+        "v0"
+      ]
+    ],
+    [
+      "a1_enlace:2",
+      "esp:D25",
+      "blue",
+      [
+        "v14",
+        "h-30",
+        "v0"
+      ]
+    ],
+    [
+      "a1_enlace:3",
+      "esp:GND.2",
+      "black",
+      [
+        "v26",
+        "h-38",
+        "v0"
+      ]
+    ],
+    [
+      "a2_campo:SIG",
+      "esp:D35",
+      "green",
+      [
+        "v12",
+        "h-30",
+        "v0"
+      ]
+    ],
+    [
+      "a2_campo:VCC",
+      "esp:3V3",
+      "red",
+      [
+        "v24",
+        "h-36",
+        "v0"
+      ]
+    ],
+    [
+      "a2_campo:GND",
+      "esp:GND.2",
+      "black",
+      [
+        "v34",
+        "h-42",
+        "v0"
+      ]
+    ],
+    [
+      "a2_enlace:2",
+      "esp:D26",
+      "green",
+      [
+        "v14",
+        "h-30",
+        "v0"
+      ]
+    ],
+    [
+      "a2_enlace:3",
+      "esp:GND.2",
+      "black",
+      [
+        "v26",
+        "h-38",
+        "v0"
+      ]
+    ],
+    [
+      "a3_campo:SIG",
+      "esp:D32",
+      "orange",
+      [
+        "v12",
+        "h-30",
+        "v0"
+      ]
+    ],
+    [
+      "a3_campo:VCC",
+      "esp:3V3",
+      "red",
+      [
+        "v24",
+        "h-36",
+        "v0"
+      ]
+    ],
+    [
+      "a3_campo:GND",
+      "esp:GND.2",
+      "black",
+      [
+        "v34",
+        "h-42",
+        "v0"
+      ]
+    ],
+    [
+      "a3_enlace:2",
+      "esp:D27",
+      "orange",
+      [
+        "v14",
+        "h-30",
+        "v0"
+      ]
+    ],
+    [
+      "a3_enlace:3",
+      "esp:GND.2",
+      "black",
+      [
+        "v26",
+        "h-38",
+        "v0"
+      ]
+    ],
+    [
+      "a4_campo:SIG",
+      "esp:D33",
+      "purple",
+      [
+        "v12",
+        "h-30",
+        "v0"
+      ]
+    ],
+    [
+      "a4_campo:VCC",
+      "esp:3V3",
+      "red",
+      [
+        "v24",
+        "h-36",
+        "v0"
+      ]
+    ],
+    [
+      "a4_campo:GND",
+      "esp:GND.2",
+      "black",
+      [
+        "v34",
+        "h-42",
+        "v0"
+      ]
+    ],
+    [
+      "a4_enlace:2",
+      "esp:D14",
+      "purple",
+      [
+        "v14",
+        "h-30",
+        "v0"
+      ]
+    ],
+    [
+      "a4_enlace:3",
+      "esp:GND.2",
+      "black",
+      [
+        "v26",
+        "h-38",
+        "v0"
+      ]
+    ]
+  ]
+}

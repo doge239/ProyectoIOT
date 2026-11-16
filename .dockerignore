@@ -1,0 +1,16 @@
+.git
+.pio
+.venv
+.local
+data
+**/.env
+**/__pycache__
+**/.pytest_cache
+**/node_modules
+**/dist
+**/.angular
+**/android
+**/ios
+**/config.local.h
+frontend/public/config.json
+nodos

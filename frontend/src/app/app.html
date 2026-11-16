@@ -1,0 +1,89 @@
+@if (!ready()) {
+  <div class="loading" role="status"><span class="brand-mark">P<span>·</span></span><p>Preparando tu estacionamiento…</p></div>
+} @else if (!authenticated()) {
+  <main class="login-layout">
+    <section class="login-intro">
+      <a class="brand" href="/" aria-label="Inicio"><span class="brand-mark">P<span>·</span></span><span>parquea<span class="brand-suffix"> / IoT</span></span></a>
+      <div class="intro-copy"><span class="eyebrow">CADA ESPACIO, BAJO CONTROL</span><h1>Tu estacionamiento.<br>En tiempo real.</h1><p>Una vista clara de cada puesto, desde donde estés.</p>
+        <div class="mini-parking" aria-hidden="true"><span>A1<i class="mini-car"></i></span><span class="available">A2<small>LIBRE</small></span><span>A3<i class="mini-car"></i></span><span class="available">A4<small>LIBRE</small></span></div>
+        <div class="intro-caption"><span class="dot"></span> Sensores conectados. Decisiones simples.</div>
+      </div><p class="intro-footer">GESTIÓN DE ESTACIONAMIENTOS · SISTEMA IoT</p>
+    </section>
+    <section class="login-panel">
+      <div class="login-card"><span class="eyebrow muted">PANEL DE ADMINISTRACIÓN</span><h2>Bienvenido de vuelta</h2><p class="subtle">Ingresa para supervisar y administrar tus puestos.</p>
+        <form #loginForm="ngForm" (ngSubmit)="login()">
+          <label for="username">Usuario</label><input id="username" name="username" autocomplete="username" [(ngModel)]="username" required maxlength="80">
+          <label for="password">Contraseña</label><input id="password" name="password" type="password" autocomplete="current-password" [(ngModel)]="password" required maxlength="256">
+          @if (error()) { <p class="alert error" role="alert">{{ error() }}</p> }
+          <button class="primary login-button" [disabled]="busy() || loginForm.invalid">{{ busy() ? 'Ingresando…' : 'Ingresar al panel' }} <span aria-hidden="true">↗</span></button>
+        </form>
+        <p class="login-note"><span aria-hidden="true">◇</span> Acceso exclusivo para administración.<br>La ocupación se registra automáticamente mediante sensores.</p>
+      </div><p class="login-bottom">Menos vueltas. Más control.</p>
+    </section>
+  </main>
+} @else {
+  <div class="workspace">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="Inicio"><span class="brand-mark">P<span>·</span></span><span>parquea<span class="brand-suffix"> / IoT</span></span></a>
+      <div class="nav-caption">ADMINISTRACIÓN</div>
+      <nav aria-label="Navegación principal">
+        <button [class.active]="tab() === 'overview'" [attr.aria-current]="tab() === 'overview' ? 'page' : null" (click)="navigate('overview')"><span aria-hidden="true">▦</span> Vista general</button>
+        <button [class.active]="tab() === 'slots'" [attr.aria-current]="tab() === 'slots' ? 'page' : null" (click)="navigate('slots')"><span aria-hidden="true">▤</span> Puestos</button>
+        <button [class.active]="tab() === 'settings'" [attr.aria-current]="tab() === 'settings' ? 'page' : null" (click)="navigate('settings')"><span aria-hidden="true">⚙</span> Configuración</button>
+      </nav>
+      <div class="sidebar-bottom"><div class="sensor-info"><span class="dot"></span><strong>Detección automática</strong><p>Los sensores informan la ocupación de cada puesto.</p></div>
+        <div class="admin-profile"><span class="avatar">AD</span><div><strong>Administrador</strong><small>Acceso de gestión</small></div></div>
+        <button class="logout" (click)="logout()" [disabled]="busy()">Cerrar sesión <span aria-hidden="true">↗</span></button>
+      </div>
+    </aside>
+    <div class="main-column">
+      <header class="topbar"><span>{{ config().nombre }}</span><div class="connection" [class.offline]="!connected()" role="status"><span class="dot"></span>{{ connected() ? 'Servidor conectado' : 'Reconectando…' }}</div></header>
+      <main class="content">
+        <div class="page-heading"><div><span class="eyebrow muted">TU ESPACIO DE CONTROL</span><h1>{{ tab() === 'overview' ? 'Vista general' : tab() === 'slots' ? 'Administrar puestos' : 'Configuración' }}</h1><p class="subtle">{{ tab() === 'overview' ? 'Todo lo que pasa en tu estacionamiento, en un solo lugar.' : tab() === 'slots' ? 'Organiza tus espacios y gestiona su disponibilidad.' : 'Ajusta los detalles de tu estacionamiento y la conexión de sensores.' }}</p></div><span class="admin-tag">ADMINISTRADOR</span></div>
+        @if (error()) { <div class="alert error" role="alert">{{ error() }}</div> }
+        @if (notice()) { <div class="alert success" role="status">{{ notice() }}<button aria-label="Descartar aviso" (click)="notice.set('')">×</button></div> }
+        @if (!connected()) { <div class="alert warning" role="status">No se pudo obtener el estado actual. Los puestos habilitados se muestran sin datos hasta recuperar la conexión.</div> }
+
+        @if (tab() === 'overview') {
+          <section class="metrics" aria-label="Resumen de ocupación">
+            <article class="metric"><div><span>Puestos totales</span><i aria-hidden="true">▦</i></div><strong>{{ slots().length }}</strong><small>{{ enabledCount() }} habilitados para operar</small></article>
+            <article class="metric metric-free"><div><span>Disponibles</span><i aria-hidden="true">↗</i></div><strong>{{ counts().libre }}<span>libres</span></strong><small>Espacios listos para recibir vehículos</small></article>
+            <article class="metric"><div><span>Ocupados</span><i class="red" aria-hidden="true">▰</i></div><strong>{{ counts().ocupado }}</strong><small>{{ occupation() }}% de los puestos habilitados</small></article>
+            <article class="metric"><div><span>Requieren atención</span><i class="amber" aria-hidden="true">!</i></div><strong>{{ counts().sin_datos + counts().deshabilitado }}</strong><small>{{ counts().sin_datos }} sin datos · {{ counts().deshabilitado }} deshabilitados</small></article>
+          </section>
+          <section class="parking-section"><div class="section-heading"><div><h2>Estado del estacionamiento</h2><p class="subtle">La ocupación se actualiza automáticamente.</p></div><span class="live-badge"><span class="dot"></span> EN VIVO</span></div>
+            <div class="parking-surface"><div class="entry-label"><span>ENTRADA</span><span aria-hidden="true">↓</span><div></div></div>
+              <div class="parking-grid">
+                @for (slot of slots(); track slot.id) {
+                  <button class="parking-slot" [attr.data-state]="slot.estado" (click)="edit(slot, $event)" [attr.aria-label]="'Editar ' + slot.nombre + ', ' + labels[slot.estado]">
+                    <div class="slot-heading"><strong>{{ slot.nombre }}</strong><span>{{ slot.id }}</span></div>
+                    <div class="vehicle-area" aria-hidden="true">@if (slot.estado === 'ocupado') { <div class="car"><div class="windshield"></div><div class="car-roof"></div><div class="rear-window"></div></div> } @else if (slot.estado === 'libre') { <span class="free-symbol">P</span> } @else { <span class="inactive-symbol">{{ slot.estado === 'deshabilitado' ? '⊘' : '· · ·' }}</span> }</div>
+                    <span class="status"><span class="dot"></span>{{ labels[slot.estado] }}</span><span class="slot-zone">{{ slot.sector }}</span>
+                  </button>
+                }
+              </div><div class="driveway" aria-hidden="true"><span>←</span><div></div><span>CIRCULACIÓN</span><div></div><span>→</span></div>
+            </div>
+            <div class="parking-footer"><div class="legend">@for (state of states; track state) { <span [attr.data-state]="state"><i></i>{{ labels[state] }}</span> }</div><small>Selecciona un puesto para editarlo</small></div>
+          </section>
+          <section class="details-section"><div class="section-heading"><h2>Detalle de sensores</h2><button class="text-button" (click)="navigate('slots')">Administrar puestos <span aria-hidden="true">↗</span></button></div><div class="table-wrap"><table><thead><tr><th>Puesto</th><th>Sector</th><th>Estado</th><th>Lectura ADC</th><th>Último reporte</th></tr></thead><tbody>@for (slot of slots(); track slot.id) { <tr><td><strong>{{ slot.nombre }}</strong><small class="cell-id">{{ slot.id }}</small></td><td>{{ slot.sector }}</td><td><span class="status" [attr.data-state]="slot.estado"><span class="dot"></span>{{ labels[slot.estado] }}</span></td><td class="mono">{{ slot.adc ?? '—' }}</td><td>{{ slot.ultimo_reporte ? (slot.ultimo_reporte | date:'HH:mm:ss') : 'Sin reportes' }}</td></tr> }</tbody></table></div></section>
+        }
+        @if (tab() === 'slots') {
+          <div class="filters"><label class="search"><span class="sr-only">Buscar puesto</span><input placeholder="Buscar por nombre, ID o sector…" [ngModel]="search()" (ngModelChange)="search.set($event)"></label><label><span class="sr-only">Filtrar por estado</span><select [ngModel]="filter()" (ngModelChange)="filter.set($event)"><option value="todos">Todos los estados</option>@for (state of states; track state) { <option [value]="state">{{ labels[state] }}</option> }</select></label><span class="subtle">{{ filtered().length }} puestos</span></div>
+          <section class="management-grid" aria-label="Administración de puestos">@for (slot of filtered(); track slot.id) {
+            <article class="management-card"><div class="management-heading"><span class="slot-code">{{ slot.id }}</span><span class="status" [attr.data-state]="slot.estado"><span class="dot"></span>{{ labels[slot.estado] }}</span></div><h2>{{ slot.nombre }}</h2><p class="subtle">{{ slot.sector }}</p><p class="notes">{{ slot.notas || 'Sin notas adicionales.' }}</p>@if (!slot.habilitado) { <p class="disabled-reason"><strong>Motivo:</strong> {{ slot.motivo_desactivacion }}</p> }<div class="management-bottom"><small>Sensor: {{ labels[slot.estado_sensor] }}</small><button class="secondary" (click)="edit(slot, $event)" [attr.aria-label]="'Editar ' + slot.id">Editar puesto ↗</button></div></article>
+          } @empty { <div class="empty-state"><h2>No hay coincidencias</h2><p>Prueba con otro nombre o cambia el filtro.</p></div> }</section>
+        }
+        @if (tab() === 'settings') {
+          <section class="settings-card"><span class="eyebrow muted">GENERAL</span><h2>Detalles del estacionamiento</h2><p class="subtle">Estos ajustes se aplican a todos los puestos.</p><form #settingsForm="ngForm" (ngSubmit)="saveSettings()"><label for="site-name">Nombre del estacionamiento</label><input id="site-name" name="siteName" [(ngModel)]="settingsDraft.nombre" required maxlength="80" pattern=".*\S.*"><label for="stale-time">Tiempo para marcar «Sin datos»</label><div class="input-with-unit"><input id="stale-time" name="staleTime" type="number" min="3" max="300" step="1" [(ngModel)]="settingsDraft.segundos_sin_datos" required><span>segundos</span></div><p class="field-help">Si un sensor deja de reportar durante este tiempo, su puesto se marca sin datos. Entre 3 y 300 segundos.</p><button class="primary" [disabled]="busy() || settingsForm.invalid">{{ busy() ? 'Guardando…' : 'Guardar configuración' }}</button></form></section>
+          <div class="info-card"><span aria-hidden="true">◇</span><div><h3>La ocupación la determina el sensor</h3><p>Puedes deshabilitar puestos por mantenimiento o cambiar su información. Los estados libre y ocupado se reciben automáticamente del dispositivo.</p></div></div>
+        }
+        <footer class="page-footer"><span>parquea / IoT</span><span>{{ updated() ? 'Última sincronización: ' + (updated() | date:'HH:mm:ss') : 'Esperando sincronización' }}</span></footer>
+      </main>
+    </div>
+  </div>
+}
+@if (editing(); as slot) {
+  <div class="modal-backdrop" (click)="closeEdit()"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-title" (click)="$event.stopPropagation()" (keydown.escape)="closeEdit()" (keydown)="trapDialog($event)"><div class="section-heading"><div><span class="eyebrow muted">GESTIÓN DE PUESTOS · {{ slot.id }}</span><h2 id="edit-title">Editar puesto</h2></div><button class="icon-button" type="button" (click)="closeEdit()" [disabled]="busy()" aria-label="Cerrar edición">×</button></div>
+    <form #slotForm="ngForm" (ngSubmit)="saveSlot()"><label for="slot-name">Nombre visible</label><input id="slot-name" name="slotName" [(ngModel)]="slot.nombre" required maxlength="60" pattern=".*\S.*"><label for="slot-zone">Sector</label><input id="slot-zone" name="slotZone" [(ngModel)]="slot.sector" required maxlength="60" pattern=".*\S.*"><label for="slot-notes">Notas <span class="optional">Opcional</span></label><textarea id="slot-notes" name="slotNotes" [(ngModel)]="slot.notas" maxlength="1000" rows="2" placeholder="Referencia, ubicación o indicaciones…"></textarea><label class="toggle-row" for="slot-enabled"><span><strong>Puesto habilitado</strong><small>Disponible para operar en el estacionamiento</small></span><input id="slot-enabled" name="enabled" type="checkbox" [(ngModel)]="slot.habilitado"></label>@if (!slot.habilitado) { <label for="disabled-reason">Motivo de desactivación</label><input id="disabled-reason" name="reason" [(ngModel)]="slot.motivo_desactivacion" required maxlength="240" pattern=".*\S.*" placeholder="Por ejemplo: mantenimiento del sector"><p class="field-help">El puesto se excluye de los disponibles. El sensor puede seguir reportando.</p> }<p class="field-help">El identificador {{ slot.id }} se conserva para mantener la conexión con su sensor.</p>@if (modalError()) { <p class="alert error" role="alert">{{ modalError() }}</p> }<div class="modal-actions"><button class="secondary" type="button" (click)="closeEdit()" [disabled]="busy()">Cancelar</button><button class="primary" [disabled]="busy() || slotForm.invalid">{{ busy() ? 'Guardando…' : 'Guardar cambios' }}</button></div></form>
+  </section></div>
+}

@@ -1,0 +1,6 @@
+fastapi==0.163.1
+uvicorn==0.54.0
+SQLAlchemy==2.1.8
+psycopg[binary]==3.3.9
+pwdlib[argon2]==0.4.2
+python-dotenv==1.2.4

@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Estacionamiento IoT</title>
+<style>
+  :root {
+    color-scheme: light;
+    font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    color: #142538;
+    background: #f0f4f8;
+    --free: #126048;
+    --occupied: #a52330;
+    --offline: #516071;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-width: 280px; }
+  header { background: #10283e; color: #fff; }
+  .wrap { width: min(69rem, calc(100% - 3rem)); margin: auto; }
+  .masthead {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; flex-wrap: wrap; padding: 2.5rem 0;
+  }
+  h1, h2, p { margin: 0; }
+  h1 { font-size: clamp(1.8rem, 5vw, 3rem); letter-spacing: -.045em; }
+  #connection {
+    color: #dfebf5; border: 1px solid #526c83; border-radius: .35rem;
+    padding: .55rem .8rem; font-size: .85rem;
+  }
+  main { padding: 2rem 0 3rem; }
+  .overview {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: .75rem 1.5rem; flex-wrap: wrap; margin-bottom: 1rem;
+  }
+  h2 { font-size: 1.3rem; }
+  #summary { color: #40566a; font-size: .92rem; }
+  .deck {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .8rem; padding: .85rem; background: #24374a; border-radius: .8rem;
+  }
+  .slot {
+    --label: var(--offline); --surface: #eef2f7; --line: #828fa1;
+    display: flex; flex-direction: column; align-items: flex-start;
+    gap: .75rem; min-height: 11.5rem; padding: 1rem;
+    border-top: .34rem solid var(--line); border-radius: .4rem; background: var(--surface);
+  }
+  .slot[data-state="libre"] {
+    --label: var(--free); --surface: #edf9f4; --line: #278c6b;
+  }
+  .slot[data-state="ocupado"] {
+    --label: var(--occupied); --surface: #fff2f2; --line: #cf4656;
+  }
+  .slot h3 { margin: 0; font-size: 2.25rem; letter-spacing: -.05em; }
+  .state { color: var(--label); font-weight: 750; }
+  .reading { margin-top: auto; font-size: .86rem; color: #465a6d; }
+  @media (max-width: 680px) {
+    .wrap { width: calc(100% - 2rem); }
+    .masthead { padding: 1.5rem 0; }
+    .deck { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .slot { min-height: 9rem; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap masthead">
+    <h1>Estacionamiento IoT</h1>
+    <p id="connection" role="status">Conectando con el servidor…</p>
+  </div>
+</header>
+<main class="wrap">
+  <div class="overview">
+    <h2>Sector A</h2>
+    <p id="summary">4 sin datos</p>
+  </div>
+  <section class="deck" aria-label="Puestos del sector A">
+    <article class="slot" id="A1"><h3>A1</h3><p class="state">Sin datos</p><p class="reading">ADC —</p></article>
+    <article class="slot" id="A2"><h3>A2</h3><p class="state">Sin datos</p><p class="reading">ADC —</p></article>
+    <article class="slot" id="A3"><h3>A3</h3><p class="state">Sin datos</p><p class="reading">ADC —</p></article>
+    <article class="slot" id="A4"><h3>A4</h3><p class="state">Sin datos</p><p class="reading">ADC —</p></article>
+  </section>
+</main>
+<script>
+  const slots = Array.from(document.querySelectorAll('.slot'));
+  const summary = document.getElementById('summary');
+  const connection = document.getElementById('connection');
+  const labels = { libre: 'Libre', ocupado: 'Ocupado', sin_datos: 'Sin datos' };
+
+  function render(readings) {
+    const counts = { libre: 0, ocupado: 0, sin_datos: 0 };
+    for (const slot of slots) {
+      const reading = readings[slot.id] ?? { estado: 'sin_datos', adc: null };
+      counts[reading.estado] += 1;
+      slot.dataset.state = reading.estado;
+      slot.querySelector('.state').textContent = labels[reading.estado];
+      slot.querySelector('.reading').textContent = 'ADC ' + (reading.adc ?? '—');
+    }
+    summary.textContent = counts.libre + (counts.libre === 1 ? ' libre' : ' libres')
+      + ' · ' + counts.ocupado + (counts.ocupado === 1 ? ' ocupado' : ' ocupados')
+      + ' · ' + counts.sin_datos + ' sin datos';
+  }
+
+  function showConnection(message) {
+    if (connection.textContent !== message) connection.textContent = message;
+  }
+
+  async function refresh() {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2500);
+    try {
+      const response = await fetch('/api/puestos', {
+        cache: 'no-store',
+        signal: controller.signal
+      });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const data = await response.json();
+      render(data.puestos);
+      showConnection('Servidor conectado');
+    } catch {
+      render({});
+      showConnection('Servidor sin conexión');
+    } finally {
+      clearTimeout(timeout);
+      setTimeout(refresh, 700);
+    }
+  }
+
+  refresh();
+</script>
+</body>
+</html>
